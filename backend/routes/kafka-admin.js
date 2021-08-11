@@ -52,7 +52,8 @@ router.get('/config', function (req, res, next) {
 router.post('/connect', function (req, res, next) {
   const data = req.body;
   console.log(data, '......data');
-  delete data.connectRetryOptions;
+  // delete data.connectRetryOptions;
+  // data.requestTimeout = 10;
   const client = new kafka.KafkaClient(data);
   const admin = new kafka.Admin(client); // client must be KafkaClient
   admin.listGroups((err, _res) => {
@@ -96,7 +97,10 @@ router.get('/delete-topics/:name', function (req, res, next) {
   // });
   console.log(req.params.name, '...req.params.name');
   const Consumer = kafka.Consumer,
-    client = new kafka.KafkaClient();
+    client = new kafka.KafkaClient(),
+    consumer = new Consumer(client, [{
+      topic: req.params.name
+    }]);
   // consumer = new Consumer(
   //   client,
   //   // [{
@@ -107,17 +111,25 @@ router.get('/delete-topics/:name', function (req, res, next) {
   //   // }
   // );
 
-
-  // const client = new kafka.KafkaClient();
-  // const consumer = new kafka.Consumer(client); // client must be KafkaClient
-  client.removeTopics([req.params.name], (err, _res) => {
-    console.log(err, '......err');
+  consumer.addTopics([req.params.name], function (err, added) {
     res.send({
       status: true,
       data: _res
     });
-    // result is an array of any errors if a given topic could not be created
-  })
+  });
+
+
+  // const client = new kafka.KafkaClient();
+  // const consumer = new kafka.Consumer(client); // client must be KafkaClient
+
+  // client.removeTopics([req.params.name], (err, _res) => {
+  //   console.log(err, '......err');
+  //   res.send({
+  //     status: true,
+  //     data: _res
+  //   });
+  //   // result is an array of any errors if a given topic could not be created
+  // })
 
 
 
@@ -137,6 +149,11 @@ router.get('/topics-list', function (req, res, next) {
 
 /* GET users listing. */
 router.post('/get-message', function (req, res, next) {
+
+  const {
+    connectiondata
+  } = req.headers;
+
 
   const {
     add: {
@@ -167,7 +184,7 @@ router.post('/get-message', function (req, res, next) {
   console.log(addClient, '...addClient');
 
   const Consumer = kafka.Consumer;
-  const client = new kafka.KafkaClient();
+  const client = new kafka.KafkaClient(JSON.parse(connectiondata));
   const consumerAdd = new Consumer(
     client,
     addClient, {
@@ -261,10 +278,30 @@ router.post('/add-topic', function (req, res, next) {
   const client = new kafka.KafkaClient();
   const admin = new kafka.Admin(client); // client must be KafkaClient
   admin.createTopics(topics, (err, _res) => {
-    res.send({
-      status: true,
-      data: _res
-    });
+    if (_res.length) {
+      const [data] = _res;
+      const error = data.error;
+
+      if (error) {
+        res.send({
+          status: true,
+          data: _res,
+          error
+        });
+      } else {
+        res.send({
+          status: true,
+          data: _res
+        });
+      }
+    } else {
+      res.send({
+        status: true,
+        data: _res
+      });
+    }
+
+
     // result is an array of any errors if a given topic could not be created
   })
 });
